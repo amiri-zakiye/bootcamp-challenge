@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import FormType from "../constants/FormType";
 
@@ -8,7 +8,6 @@ export const ARRAY_SEPARATOR = "--";
 
 function parseUrl(url) {
   const queryString = url.split("?")[1];
-  console.log(queryString);
 
   if (!queryString) {
     return {};
@@ -22,8 +21,6 @@ function parseUrl(url) {
     const [key, value] = pair.split(EQUAL_SIGN);
     data[key] = value;
   });
-
-  console.log(data);
 
   return data;
 }
@@ -61,11 +58,15 @@ function canBeParsedAsInt(value) {
 // TODO: complete this hook
 function useFilter(formData) {
   const location = useLocation();
-  const [filterState, setFilterState] = useState(parseUrl(location.search));
+  let filterState = useMemo(() => parseUrl(location.search), [location.search]);
+
+  const setFilterState = (s) => {
+    navigate(stringifyUrl(s));
+  };
+
   const navigate = useNavigate();
 
   function onChange(e, name, type) {
-    // console.log(e.target.value);
     const value = canBeParsedAsInt(e.target.value);
     if (type === "checkbox-group") {
       if (filterState[name] && !filterState[name].includes(value)) {
@@ -83,15 +84,10 @@ function useFilter(formData) {
     }
   }
 
-  useEffect(() => {
-    console.log("filterState", filterState);
-    navigate(stringifyUrl(filterState));
-  }, [filterState]);
 
   function onClear(name) {
     const newFilterState = { ...filterState };
     delete newFilterState[name];
-    console.log("newFilterState", newFilterState);
     setFilterState(newFilterState);
   }
   function onClearAll() {
