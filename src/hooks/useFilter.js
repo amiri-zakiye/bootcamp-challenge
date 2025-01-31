@@ -1,100 +1,82 @@
 import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import FormType from "../constants/FormType";
 
 export const EQUAL_SIGN = "~";
 export const AND_SIGN = "+";
 export const ARRAY_SEPARATOR = "--";
 
-function parseUrl(url) {
+const parseUrl = (url) => {
   const queryString = url.split("?")[1];
+  if (!queryString) return {};
 
-  if (!queryString) {
-    return {};
-  }
-
-  const data = {};
-
-  const pairs = queryString.split(AND_SIGN);
-
-  pairs.forEach((pair) => {
+  return queryString.split(AND_SIGN).reduce((acc, pair) => {
     const [key, value] = pair.split(EQUAL_SIGN);
-    data[key] = value;
-  });
+    acc[key] =
+      key === "seller-type" || key === "brand"
+        ? value.split(ARRAY_SEPARATOR).map(canBeParsedAsInt)
+        : canBeParsedAsInt(value);
 
-  return data;
-}
+    return acc;
+  }, {});
+};
 
-function stringifyUrl(data) {
-  let str = "?";
+const stringifyUrl = (data) => {
+  return (
+    "?" +
+    Object.entries(data)
+      .map(([key, value]) => {
+        console.log(value);
+        return Array.isArray(value)
+          ? `${key}${EQUAL_SIGN}${value.join(ARRAY_SEPARATOR)}`
+          : `${key}${EQUAL_SIGN}${value}`;
+      })
+      .join(AND_SIGN)
+  );
+};
 
-  const parts = Object.keys(data)
-    .map((key) => {
-      if (data[key]) {
-        if (typeof data[key] === "object") {
-          return `${key}${EQUAL_SIGN}${data[key].join(ARRAY_SEPARATOR)}`;
-        } else {
-          return `${key}${EQUAL_SIGN}${data[key]}`;
-        }
-      }
-      return null;
-    })
-    .filter((part) => part !== null);
-
-  str += parts.join(AND_SIGN);
-
-  return str;
-}
-
-function canBeParsedAsInt(value) {
+const canBeParsedAsInt = (value) => {
   const num = Number(value);
-  const ifInt = Number.isInteger(num) && !isNaN(num);
-  if (ifInt) {
-    return parseInt(num);
-  }
-  return value;
-}
+  return Number.isInteger(num) && !isNaN(num) ? num : value;
+};
 
-// TODO: complete this hook
-function useFilter(formData) {
+const useFilter = () => {
   const location = useLocation();
-  let filterState = useMemo(() => parseUrl(location.search), [location.search]);
-
-  const setFilterState = (s) => {
-    navigate(stringifyUrl(s));
-  };
-
   const navigate = useNavigate();
 
-  function onChange(e, name, type) {
+  const filterState = useMemo(
+    () => parseUrl(location.search),
+    [location.search]
+  );
+
+  const setFilterState = (newState) => {
+    navigate(stringifyUrl(newState));
+    console.log(newState);
+  };
+
+  const onChange = (e, name, type) => {
     const value = canBeParsedAsInt(e.target.value);
+    const newFilterState = { ...filterState };
+
     if (type === "checkbox-group") {
-      if (filterState[name] && !filterState[name].includes(value)) {
-        setFilterState({
-          ...filterState,
-          [name]: [...filterState[name], value],
-        });
-      } else {
-        setFilterState({ ...filterState, [name]: [value] });
-      }
-    } else if (type === "range") {
-      setFilterState({ ...filterState, [name]: e.target.value });
+      const checkbox = filterState[name];
+      newFilterState[name] =
+        checkbox && !checkbox.includes(value) ? [...checkbox, value] : [value];
     } else {
-      setFilterState({ ...filterState, [name]: value });
+      newFilterState[name] = value;
     }
-  }
 
+    setFilterState(newFilterState);
+  };
 
-  function onClear(name) {
+  const onClear = (name) => {
     const newFilterState = { ...filterState };
     delete newFilterState[name];
     setFilterState(newFilterState);
-  }
-  function onClearAll() {
-    setFilterState({});
-  }
+  };
+
+  const onClearAll = () => setFilterState({});
 
   return { filterState, setFilterState, onChange, onClear, onClearAll };
-}
+};
 
 export default useFilter;
